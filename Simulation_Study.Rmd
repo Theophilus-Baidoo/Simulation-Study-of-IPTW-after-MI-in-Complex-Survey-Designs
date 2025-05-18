@@ -28,7 +28,7 @@ geometry: margin = 0.8in
 fontsize: 10pt
 params:
   proj_number: I
-  proj_title: NHANES Study
+  proj_title: Simulation Study
 ---
 
 ```{r}
