@@ -1,0 +1,163 @@
+---
+title: 'A Simulation Study of Inverse Probability of Treatment Weighting after Multiple Imputation in Complex Survey Designs'
+author: 
+  - Theophilus Baidoo^[tbaidoo@iu.edu, Indiana University Bloomington (IUB).]
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  bookdown::pdf_document2:
+    fig_caption: true
+    latex_engine: xelatex
+    number_sections: true
+    toc: true
+    toc_depth: 4
+header-includes:
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \usepackage{amsfonts}
+  - \usepackage{amsthm}
+  - \usepackage{floatrow}
+  - \usepackage{fancyhdr}
+  - \pagestyle{fancy}
+  - \fancyhf{}
+  - \rhead{Theophilus Baidoo}
+  - \lhead{Project `r params$proj_number` -- `r params$proj_title`}
+  - \cfoot{\thepage}
+  - \usepackage{algorithm}
+  - \usepackage[noend]{algpseudocode}
+geometry: margin = 0.8in
+fontsize: 10pt
+params:
+  proj_number: I
+  proj_title: NHANES Study
+---
+
+```{r}
+library(mice)
+library(MatchThem)
+library(cobalt)
+library(survey)
+library(sandwich)
+library(lmtest)
+library(mitools)
+library(ggplot2)
+library(dplyr)
+```
+
+
+```{r}
+set.seed(123)
+n <- 1000
+data <- data.frame(
+  id = 1:n,
+  age = rnorm(n, 50, 10),
+  sex = factor(sample(c("Male", "Female"), n, replace = TRUE)),
+  race = factor(sample(c("White", "Black", "Hispanic", "Other"), n, replace = TRUE)),
+  income = rnorm(n, 50000, 10000),
+  bmi = rnorm(n, 27, 5),
+  treatment = rbinom(n, 1, 0.5),
+  outcome = rbinom(n, 1, 0.3),  # binary outcome
+  psu = sample(1:5, n, replace = TRUE),
+  strata = sample(1:3, n, replace = TRUE),
+  weight = runif(n, 0.5, 2)
+)
+
+# Induce missingness
+data$income[sample(1:n, 150)] <- NA
+data$bmi[sample(1:n, 150)] <- NA
+plot_missing(data)
+
+# Multiple imputation (eg.m = 5)
+imp <- mice(data, m = 5, method = "pmm", seed = 500)
+
+# Perform IPTW on each imputed dataset
+weighted <- weightthem(
+  treatment ~ age + sex + race + income + bmi,
+  data = imp,
+  method = "ps",
+  estimand = "ATE"
+)
+
+# covariate balance 
+balance <- bal.tab(weighted, un = TRUE, disp.v.ratio = TRUE)
+print(balance)
+
+# Standardized Love Plot
+love.plot(
+  weighted,
+  stat = "mean.diffs",
+  thresholds = c(m = .1),
+  abs = TRUE,
+  var.order = "unadjusted",
+  var.names = c(age = "Age", sex = "Sex", race = "Race",
+                income = "Income", bmi = "BMI"),
+  colors = c("grey", "blue"),
+  shapes = c("circle", "triangle"),
+  title = "Covariate Balance Before and After IPTW",
+  subtitle = "Standardized Mean Differences (Across Imputations)"
+)
+
+#or
+p.sim <- love.plot(
+  x = weighted,
+  stat = "mean.diffs",
+  thresholds = c(m = 0.1),
+  abs = FALSE,
+  var.names = labels,
+  binary = "std",
+  continuous = "std",
+  s.d.denom = "pooled",
+  shapes = c("circle filled", "triangle filled"),
+  colors = c("orange", "green"),
+  e.names = c("Unweighted", "Weighted (IPTW)"),
+  size = 7
+)
+p.sim <- p.sim + 
+  scale_shape_manual(values = c(16, 17)) + 
+  theme(
+    legend.position = "inside",
+    legend.position.inside = c(.89, .93),
+    legend.background = element_rect(color = "grey", fill = "white"),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.key.size = unit(1, "cm"),
+    axis.title.x = element_text(size = 18, margin = margin(t = 20)),
+    axis.text = element_text(size = 14),
+    strip.text = element_text(size = 16),
+    plot.margin = margin(10, 10, 10, 10)
+  ) +
+  labs(
+    title = "Covariate Balance Before and After IPTW",
+    x = "Standardized Mean Difference"
+  )
+
+print(p.sim)
+
+
+
+imp_data <- complete(weighted, "all")
+
+
+models <- lapply(imp_data, function(df) {
+  design <- svydesign(
+    ids = ~psu,
+    strata = ~strata,
+    weights = ~weights,  
+    data = df,
+    nest = TRUE
+  )
+  
+  svyglm(outcome ~ treatment + age + sex + race + income + bmi,
+         design = design,
+         family = quasipoisson(link = "log"))
+})
+
+
+
+# Pool results using Rubins rules
+pooled <- MIcombine(models)
+summary(pooled, logeffect = TRUE)
+
+
+
+```
+
