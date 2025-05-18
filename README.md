@@ -7,9 +7,7 @@ This simulation study evaluates the performance of **inverse probability of trea
 
 The simulation accounts for missing data, survey weights, stratification, and clustering. It follows the methodology outlined in:
 
-> Pishgar F, Greifer N, Leyrat C, Stuart EA (2021).  
-> "MatchThem: Matching and Weighting after Multiple Imputation."  
-> *The R Journal*, 13(2), 378–397.  
+> Pishgar F, Greifer N, Leyrat C, Stuart EA (2021). "MatchThem: Matching and Weighting after Multiple Imputation." The R Journal*, 13(2), 378–397.  
 > [https://journal.r-project.org/archive/2021/RJ-2021-073/RJ-2021-073.pdf](https://journal.r-project.org/archive/2021/RJ-2021-073/RJ-2021-073.pdf)
 
 ---
