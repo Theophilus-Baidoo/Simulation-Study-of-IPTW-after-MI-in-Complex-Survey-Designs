@@ -74,7 +74,9 @@ weighted <- weightthem(
   treatment ~ age + sex + race + income + bmi,
   data = imp,
   method = "ps",
-  estimand = "ATE"
+  estimand = "ATE",
+  stabilize = TRUE,
+  trim.at = 0.01
 )
 
 # covariate balance 
@@ -138,17 +140,20 @@ imp_data <- complete(weighted, "all")
 
 
 models <- lapply(imp_data, function(df) {
+  print(names(df))
+  df$combined_weight <- df$weights * df$weight  # Multiply IPTW by survey weight
+  
   design <- svydesign(
     ids = ~psu,
     strata = ~strata,
-    weights = ~weights,  
+    weights = ~combined_weight,
     data = df,
     nest = TRUE
   )
   
   svyglm(outcome ~ treatment + age + sex + race + income + bmi,
          design = design,
-         family = quasipoisson(link = "log"))
+         family = poisson(link = "log"))
 })
 
 
