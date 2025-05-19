@@ -71,7 +71,7 @@ imp <- mice(data, m = 5, method = "pmm", seed = 500)
 
 # Perform IPTW on each imputed dataset
 weighted <- weightthem(
-  treatment ~ age + sex + race + income + bmi,
+  treatment ~ age + sex + race + income + bmi + + psu + strata + weight, #approach by dudoff 2016 as include survey weights in the PS model (as a covariate, not as actual weights).
   data = imp,
   method = "ps",
   estimand = "ATE",
@@ -82,6 +82,15 @@ weighted <- weightthem(
 # covariate balance 
 balance <- bal.tab(weighted, un = TRUE, disp.v.ratio = TRUE)
 print(balance)
+
+balance_df <- balance$Balance
+
+# Remove rows corresponding to survey design variables
+vars_to_remove <- c("psu", "strata", "weight")
+clean_balance <- balance_df[!rownames(balance_df) %in% vars_to_remove, ]
+
+
+print(clean_balance)
 
 # Standardized Love Plot
 love.plot(
